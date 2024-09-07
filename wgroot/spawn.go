@@ -90,6 +90,38 @@ func IsRunningAsUser(username string) bool {
 	return syscall.Getuid() == uid
 }
 
+// Strip out command line arguments that are not needed by the child process.
+// stripFlags is a list of options, such as "--kernelwg", which do not have any
+// arguments after them.
+// stripParameters is a list of options, such as "--username", which have
+// an associated argument after them (such as "cyclops", in our example).
+func StripArgs(args []string, stripFlags, stripParameters []string) []string {
+	newArgs := make([]string, 0)
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if containsString(stripFlags, arg) {
+			continue
+		}
+		if containsString(stripParameters, arg) {
+			i++
+			continue
+		}
+		newArgs = append(newArgs, arg)
+	}
+
+	return newArgs
+}
+
+func containsString(list []string, item string) bool {
+	for _, x := range list {
+		if x == item {
+			return true
+		}
+	}
+	return false
+}
+
 // This is used after dropping privileges, to make sure that our process has all the hallmarks
 // of a normal user process. The reason this was created was so that NCNN could read from
 // /proc/self/auxv to detect CPU features.
