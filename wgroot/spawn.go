@@ -44,6 +44,15 @@ func LaunchRootModeSubProcess() (e error, secret string) {
 	return nil, secret
 }
 
+// Retrieve the home directory of the given user
+func GetUserHome(username string) (string, error) {
+	userRec, err := user.Lookup(username)
+	if err != nil {
+		return "", fmt.Errorf("Failed to find user '%v': %v", username, err)
+	}
+	return userRec.HomeDir, nil
+}
+
 // Drop privileges of this process to the specified username, so that we reduce our attack surface.
 // Returns the home directory of 'username'
 func DropPrivileges(username string) error {
@@ -68,14 +77,20 @@ func DropPrivileges(username string) error {
 	if err := syscall.Setuid(uid); err != nil {
 		return fmt.Errorf("Failed to setuid: %v", err)
 	}
-	if err := syscall.Setresuid(uid, uid, uid); err != nil {
-		return fmt.Errorf("Failed to setresuid: %v", err)
-	}
-	if err := syscall.Setresgid(gid, gid, gid); err != nil {
-		return fmt.Errorf("Failed to setresgid: %v", err)
-	}
+
+	// The 'res' variants are useful if you need to control REAL,EFFECTIVE,SAVED ids.
+	// But the regular setgid/setuid already set them uniformly for all 3, so we don't
+	// need the 'res' variants here.
+
+	//if err := syscall.Setresuid(uid, uid, uid); err != nil {
+	//	return fmt.Errorf("Failed to setresuid: %v", err)
+	//}
+	//if err := syscall.Setresgid(gid, gid, gid); err != nil {
+	//	return fmt.Errorf("Failed to setresgid: %v", err)
+	//}
 
 	os.Setenv("HOME", userRec.HomeDir)
+	os.Setenv("USER", userRec.Username)
 
 	return nil
 }
@@ -132,6 +147,10 @@ func RelaunchSelf(args, env []string) (*exec.Cmd, error) {
 	}
 
 	fmt.Printf("Relaunching %v with reduced privileges\n", self)
+	//fmt.Printf("Relaunching PATH=%v\n", os.Getenv("PATH"))
+	//fmt.Printf("Relaunching HOME=%v\n", os.Getenv("HOME"))
+	//fmt.Printf("Relaunching env=%v\n", env)
+	//fmt.Printf("Relaunching args=%v\n", args)
 
 	cmd := exec.Command(self, args...)
 	cmd.Env = append(cmd.Env, fmt.Sprintf("PATH=%v", os.Getenv("PATH")))
