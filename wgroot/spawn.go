@@ -53,6 +53,95 @@ func GetUserHome(username string) (string, error) {
 	return userRec.HomeDir, nil
 }
 
+// PrivilegeLimiter is used to raise/lower privileges of the current process.
+// This uses seteuid/setegid instead of setuid/setgid, to change only the effective
+// user/group. This is useful when the process periodically needs to raise
+// privileges, but keep them low most of the of the time.
+type PrivilegeLimiter struct {
+	ElevatedGid int
+	ElevatedUid int
+	LoweredGid  int
+	LoweredUid  int
+	LoweredHome string // Home directory of lower privileged user
+}
+
+type PrivilegeLimiterFlags int
+
+const (
+	// Change HOME and USER environment to the lower privilege user when first initializing,
+	// but do not change them back when elevating permissions
+	PrivilegeLimiterFlagSetEnvVars = 1 << iota
+)
+
+// Save the current user credentials, and drop privileges to the specified username,
+// with the ability to restore them again.
+func NewPrivilegeLimiter(username string, flags PrivilegeLimiterFlags) (*PrivilegeLimiter, error) {
+	if username == "" {
+		return nil, fmt.Errorf("You must specify username")
+	}
+	userRec, err := user.Lookup(username)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find user '%v': %v", username, err)
+	}
+
+	highUid := syscall.Getuid()
+	highGid := syscall.Getgid()
+	lowUid, _ := strconv.Atoi(userRec.Uid)
+	lowGid, _ := strconv.Atoi(userRec.Gid)
+
+	fmt.Printf("Dropping privileges (becoming user '%v', uid:%v, gid:%v)\n", username, lowUid, lowGid)
+
+	// It's important to change group before user
+
+	if err := syscall.Setegid(lowGid); err != nil {
+		return nil, fmt.Errorf("Failed to setegid: %v", err)
+	}
+	if err := syscall.Seteuid(lowUid); err != nil {
+		return nil, fmt.Errorf("Failed to seteuid: %v", err)
+	}
+
+	if (flags & PrivilegeLimiterFlagSetEnvVars) != 0 {
+		os.Setenv("HOME", userRec.HomeDir)
+		os.Setenv("USER", userRec.Username)
+	}
+
+	return &PrivilegeLimiter{
+		ElevatedGid: highGid,
+		ElevatedUid: highUid,
+		LoweredGid:  lowGid,
+		LoweredUid:  lowUid,
+		LoweredHome: userRec.HomeDir,
+	}, nil
+}
+
+// Elevate privileges to the higher privilege user
+func (p *PrivilegeLimiter) Elevate() error {
+	//fmt.Printf("Elevating privileges (uid:%v, gid:%v)\n", p.ElevatedUid, p.ElevatedGid)
+
+	if err := syscall.Setegid(p.ElevatedGid); err != nil {
+		return fmt.Errorf("Failed to setegid (raise): %v", err)
+	}
+	if err := syscall.Seteuid(p.ElevatedUid); err != nil {
+		return fmt.Errorf("Failed to seteuid (raise): %v", err)
+	}
+
+	return nil
+}
+
+// Drop privileges to the lower privilege user
+func (p *PrivilegeLimiter) Drop() error {
+	//fmt.Printf("Dropping privileges (uid:%v, gid:%v)\n", p.LoweredUid, p.LoweredGid)
+
+	if err := syscall.Setegid(p.LoweredGid); err != nil {
+		return fmt.Errorf("Failed to setegid (lower): %v", err)
+	}
+	if err := syscall.Seteuid(p.LoweredUid); err != nil {
+		return fmt.Errorf("Failed to seteuid (lower): %v", err)
+	}
+
+	return nil
+}
+
 // Drop privileges of this process to the specified username, so that we reduce our attack surface.
 // Returns the home directory of 'username'
 func DropPrivileges(username string) error {
