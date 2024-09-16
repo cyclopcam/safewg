@@ -154,6 +154,7 @@ func (h *handler) handleCreatePeersInMemory(request *wguser.MsgCreatePeersInMemo
 		ReplacePeers: false, // If this is false, then we append peers, which is what we want
 	}
 	for _, p := range request.Peers {
+		//h.log.Infof("Peer %v, %v, (%v)", p.AllowedIP.IP, p.AllowedIP.Mask, p.AllowedIP)
 		cfg.Peers = append(cfg.Peers, wgtypes.PeerConfig{
 			PublicKey:  p.PublicKey,
 			AllowedIPs: []net.IPNet{p.AllowedIP},
@@ -166,11 +167,13 @@ func (h *handler) handleCreatePeersInMemory(request *wguser.MsgCreatePeersInMemo
 	// Create IP routes
 	for _, p := range request.Peers {
 		var cmd *exec.Cmd
-		if len(p.AllowedIP.IP) == 4 {
+		if p.AllowedIP.IP.To4() != nil {
 			// ip -4 route add 10.100.1.1/32 dev cyclops
+			h.log.Infof("Creating IPv4 route to %v", p.AllowedIP.String())
 			cmd = exec.Command("ip", "-4", "route", "add", p.AllowedIP.String(), "dev", WireguardDeviceName)
 		} else {
 			// ip -6 route add 2001:db8:1::1/128 dev cyclops
+			h.log.Infof("Creating IPv6 route to %v", p.AllowedIP.String())
 			cmd = exec.Command("ip", "-6", "route", "add", p.AllowedIP.String(), "dev", WireguardDeviceName)
 		}
 		if err := cmd.Run(); err != nil {
@@ -194,7 +197,7 @@ func (h *handler) handleRemovePeerInMemory(request *wguser.MsgRemovePeerInMemory
 
 	// Delete IP route
 	var cmd *exec.Cmd
-	if len(request.AllowedIP.IP) == 4 {
+	if request.AllowedIP.IP.To4() != nil {
 		// ip -4 route delete 10.101.1.2/32 dev cyclops
 		cmd = exec.Command("ip", "-4", "route", "delete", request.AllowedIP.String(), "dev", WireguardDeviceName)
 	} else {
