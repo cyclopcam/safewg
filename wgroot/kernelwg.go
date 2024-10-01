@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/cyclopcam/logs"
 	"github.com/cyclopcam/safewg/wguser"
@@ -17,8 +18,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-// This is the name of our wireguard device, which is the same on the HTTPS proxy server and on a camera server.
-const WireguardDeviceName = "cyclops"
 const Debug = false
 
 type handler struct {
@@ -42,56 +41,56 @@ func (h *handler) handleAuthenticate(request *wguser.MsgAuthenticate) error {
 	return nil
 }
 
-func (h *handler) handleBringDeviceUp() error {
-	h.log.Infof("Bring up Wireguard device %v", WireguardDeviceName)
+func (h *handler) handleBringDeviceUp(request *wguser.MsgBringDeviceUp) error {
+	h.log.Infof("Bring up Wireguard device %v", request.DeviceName)
 
 	// Check first if the config file exists, so that we can return a definitive "does not exist" error.
-	if _, err := os.Stat(configFilename()); err != nil {
+	if _, err := os.Stat(configFilename(request.DeviceName)); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return wguser.ErrWireguardDeviceNotExist
 		}
 	}
 
-	cmd := exec.Command("wg-quick", "up", WireguardDeviceName)
+	cmd := exec.Command("wg-quick", "up", request.DeviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		h.log.Infof("Device %v activation failed: %v. Output: %v", WireguardDeviceName, err, string(output))
+		h.log.Infof("Device %v activation failed: %v. Output: %v", request.DeviceName, err, string(output))
 		return fmt.Errorf("%w: %v", err, string(output))
 	}
-	h.log.Infof("Device %v activation OK", WireguardDeviceName)
+	h.log.Infof("Device %v activation OK", request.DeviceName)
 	return nil
 }
 
-func (h *handler) handleTakeDeviceDown() error {
-	h.log.Infof("Taking down Wireguard device %v", WireguardDeviceName)
+func (h *handler) handleTakeDeviceDown(request *wguser.MsgTakeDeviceDown) error {
+	h.log.Infof("Taking down Wireguard device %v", request.DeviceName)
 
 	// Check first if the config file exists, so that we can return a definitive "does not exist" error.
-	if _, err := os.Stat(configFilename()); err != nil {
+	if _, err := os.Stat(configFilename(request.DeviceName)); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return wguser.ErrWireguardDeviceNotExist
 		}
 	}
 
-	cmd := exec.Command("wg-quick", "down", WireguardDeviceName)
+	cmd := exec.Command("wg-quick", "down", request.DeviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		h.log.Infof("Device %v takedown failed: %v. Output: %v", WireguardDeviceName, err, string(output))
+		h.log.Infof("Device %v takedown failed: %v. Output: %v", request.DeviceName, err, string(output))
 		return fmt.Errorf("%w: %v", err, string(output))
 	}
-	h.log.Infof("Device %v is down", WireguardDeviceName)
+	h.log.Infof("Device %v is down", request.DeviceName)
 	return nil
 }
 
-func (h *handler) handleIsDeviceAlive() error {
-	_, err := h.wg.Device(WireguardDeviceName)
+func (h *handler) handleIsDeviceAlive(request *wguser.MsgIsDeviceAlive) error {
+	_, err := h.wg.Device(request.DeviceName)
 	if errors.Is(err, os.ErrNotExist) {
 		return wguser.ErrWireguardDeviceNotExist
 	}
 	return err
 }
 
-func (h *handler) handleGetDevice() (any, error) {
-	device, err := h.wg.Device(WireguardDeviceName)
+func (h *handler) handleGetDevice(request *wguser.MsgGetDevice) (any, error) {
+	device, err := h.wg.Device(request.DeviceName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, wguser.ErrWireguardDeviceNotExist
@@ -104,28 +103,33 @@ func (h *handler) handleGetDevice() (any, error) {
 	// see a cleaner way of doing this, than by looking at the Wireguard config file.
 	// An alternative would be to read the output of "ip -4 address", but I've already got logic in here
 	// for parsing Wireguard config files, so I'm using that.
-	cfg, err := loadConfigFile(configFilename())
-	address := ""
+	cfg, err := loadConfigFile(configFilename(request.DeviceName))
+	addressLine := ""
 	if err == nil {
 		iface := cfg.findSectionByTitle("Interface")
 		if iface != nil {
 			a := iface.get("Address")
 			if a != nil {
-				address = *a
+				addressLine = *a
 			}
 		}
+	}
+
+	addresses := strings.Split(addressLine, ",")
+	for i := range addresses {
+		addresses[i] = strings.TrimSpace(addresses[i])
 	}
 
 	resp := wguser.MsgGetDeviceResponse{
 		PrivateKey: device.PrivateKey,
 		ListenPort: device.ListenPort,
-		Address:    address,
+		Addresses:  addresses,
 	}
 	return &resp, nil
 }
 
-func (h *handler) handleGetPeers() (any, error) {
-	device, err := h.wg.Device(WireguardDeviceName)
+func (h *handler) handleGetPeers(request *wguser.MsgGetPeers) (any, error) {
+	device, err := h.wg.Device(request.DeviceName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, wguser.ErrWireguardDeviceNotExist
@@ -157,27 +161,29 @@ func (h *handler) handleCreatePeersInMemory(request *wguser.MsgCreatePeersInMemo
 		//h.log.Infof("Peer %v, %v, (%v)", p.AllowedIP.IP, p.AllowedIP.Mask, p.AllowedIP)
 		cfg.Peers = append(cfg.Peers, wgtypes.PeerConfig{
 			PublicKey:  p.PublicKey,
-			AllowedIPs: []net.IPNet{p.AllowedIP},
+			AllowedIPs: p.AllowedIPs,
 		})
 	}
-	if err := h.wg.ConfigureDevice(WireguardDeviceName, cfg); err != nil {
+	if err := h.wg.ConfigureDevice(request.DeviceName, cfg); err != nil {
 		return err
 	}
 
 	// Create IP routes
 	for _, p := range request.Peers {
 		var cmd *exec.Cmd
-		if p.AllowedIP.IP.To4() != nil {
-			// ip -4 route add 10.100.1.1/32 dev cyclops
-			h.log.Infof("Creating IPv4 route to %v", p.AllowedIP.String())
-			cmd = exec.Command("ip", "-4", "route", "add", p.AllowedIP.String(), "dev", WireguardDeviceName)
-		} else {
-			// ip -6 route add 2001:db8:1::1/128 dev cyclops
-			h.log.Infof("Creating IPv6 route to %v", p.AllowedIP.String())
-			cmd = exec.Command("ip", "-6", "route", "add", p.AllowedIP.String(), "dev", WireguardDeviceName)
-		}
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("Error creating IP route to %v: %w", p.AllowedIP.String(), err)
+		for _, ipnet := range p.AllowedIPs {
+			if ipnet.IP.To4() != nil {
+				// ip -4 route add 10.100.1.1/32 dev cyclops
+				h.log.Infof("Creating IPv4 route to %v", ipnet.String())
+				cmd = exec.Command("ip", "-4", "route", "add", ipnet.String(), "dev", request.DeviceName)
+			} else {
+				// ip -6 route add 2001:db8:1::1/128 dev cyclops
+				h.log.Infof("Creating IPv6 route to %v", ipnet.String())
+				cmd = exec.Command("ip", "-6", "route", "add", ipnet.String(), "dev", request.DeviceName)
+			}
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("Error creating IP route to %v: %w", ipnet.String(), err)
+			}
 		}
 	}
 
@@ -191,36 +197,38 @@ func (h *handler) handleRemovePeerInMemory(request *wguser.MsgRemovePeerInMemory
 		PublicKey: request.PublicKey,
 		Remove:    true,
 	})
-	if err := h.wg.ConfigureDevice(WireguardDeviceName, cfg); err != nil {
+	if err := h.wg.ConfigureDevice(request.DeviceName, cfg); err != nil {
 		return err
 	}
 
-	// Delete IP route
-	var cmd *exec.Cmd
-	if request.AllowedIP.IP.To4() != nil {
-		// ip -4 route delete 10.101.1.2/32 dev cyclops
-		cmd = exec.Command("ip", "-4", "route", "delete", request.AllowedIP.String(), "dev", WireguardDeviceName)
-	} else {
-		// ip -6 route delete 2001:db8:1::2/128 dev cyclops
-		cmd = exec.Command("ip", "-6", "route", "delete", request.AllowedIP.String(), "dev", WireguardDeviceName)
-	}
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Error deleting IP route to %v: %w", request.AllowedIP.String(), err)
+	// Delete IP routes
+	for _, ipnet := range request.AllowedIPs {
+		var cmd *exec.Cmd
+		if ipnet.IP.To4() != nil {
+			// ip -4 route delete 10.101.1.2/32 dev cyclops
+			cmd = exec.Command("ip", "-4", "route", "delete", ipnet.String(), "dev", request.DeviceName)
+		} else {
+			// ip -6 route delete 2001:db8:1::2/128 dev cyclops
+			cmd = exec.Command("ip", "-6", "route", "delete", ipnet.String(), "dev", request.DeviceName)
+		}
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("Error deleting IP route to %v: %w", ipnet.String(), err)
+		}
 	}
 
 	return nil
 }
 
-func configFilename() string {
-	return fmt.Sprintf("/etc/wireguard/%v.conf", WireguardDeviceName)
+func configFilename(deviceName string) string {
+	return fmt.Sprintf("/etc/wireguard/%v.conf", deviceName)
 }
 
 // This is used on a Cyclops server when it is setting up it's Wireguard interface to
 // the proxy server. The purpose of this function is to create the initial /etc/wireguard/cyclops.conf
 // file, and/or set the [Interface] section at the top of that file.
 func (h *handler) handleCreateDeviceInConfigFile(request *wguser.MsgCreateDeviceInConfigFile) error {
-	h.log.Infof("Creating %v", configFilename())
-	cfg, err := loadConfigFile(configFilename())
+	h.log.Infof("Creating %v", configFilename(request.DeviceName))
+	cfg, err := loadConfigFile(configFilename(request.DeviceName))
 	if errors.Is(err, os.ErrNotExist) {
 		cfg = &configFile{}
 	} else if err != nil {
@@ -233,9 +241,9 @@ func (h *handler) handleCreateDeviceInConfigFile(request *wguser.MsgCreateDevice
 	}
 
 	iface.set("PrivateKey", request.PrivateKey.String())
-	iface.set("Address", request.Address)
+	iface.set("Address", strings.Join(request.Addresses, ", "))
 
-	return cfg.writeFile(configFilename())
+	return cfg.writeFile(configFilename(request.DeviceName))
 }
 
 // This is used on a Cyclops server when it is setting up it's Wireguard interface to
@@ -243,7 +251,7 @@ func (h *handler) handleCreateDeviceInConfigFile(request *wguser.MsgCreateDevice
 // /etc/wireguard/cyclops.conf that points to our proxy server.
 func (h *handler) handleSetProxyPeerInConfigFile(request *wguser.MsgSetProxyPeerInConfigFile) error {
 	h.log.Infof("Setting proxy peer in cyclops.conf")
-	cfg, err := loadConfigFile(configFilename())
+	cfg, err := loadConfigFile(configFilename(request.DeviceName))
 	if err != nil {
 		return err
 	}
@@ -253,12 +261,17 @@ func (h *handler) handleSetProxyPeerInConfigFile(request *wguser.MsgSetProxyPeer
 		peer = cfg.addSection("Peer")
 	}
 
+	allowedIPs := []string{}
+	for _, ipnet := range request.AllowedIPs {
+		allowedIPs = append(allowedIPs, ipnet.String())
+	}
+
 	peer.set("PublicKey", request.PublicKey.String())
 	peer.set("Endpoint", request.Endpoint)
-	peer.set("AllowedIPs", request.AllowedIP.String())
+	peer.set("AllowedIPs", strings.Join(allowedIPs, ", "))
 	peer.set("PersistentKeepalive", "25")
 
-	return cfg.writeFile(configFilename())
+	return cfg.writeFile(configFilename(request.DeviceName))
 }
 
 func (h *handler) handleMessage(msgType wguser.MsgType, msgLen int) error {
@@ -266,11 +279,18 @@ func (h *handler) handleMessage(msgType wguser.MsgType, msgLen int) error {
 		h.log.Infof("handleMessage %v, %v bytes", msgType, msgLen)
 	}
 
-	// Decode request, if any
+	// Decode request body
+
+	// NOTE: There is another switch statement a few lines down, which also needs
+	// to handle all message types.
 	var request any
 	switch msgType {
 	case wguser.MsgTypeAuthenticate:
 		request = &wguser.MsgAuthenticate{}
+	case wguser.MsgTypeGetPeers:
+		request = &wguser.MsgGetPeers{}
+	case wguser.MsgTypeGetDevice:
+		request = &wguser.MsgGetDevice{}
 	case wguser.MsgTypeCreatePeersInMemory:
 		request = &wguser.MsgCreatePeersInMemory{}
 	case wguser.MsgTypeRemovePeerInMemory:
@@ -279,6 +299,12 @@ func (h *handler) handleMessage(msgType wguser.MsgType, msgLen int) error {
 		request = &wguser.MsgCreateDeviceInConfigFile{}
 	case wguser.MsgTypeSetProxyPeerInConfigFile:
 		request = &wguser.MsgSetProxyPeerInConfigFile{}
+	case wguser.MsgTypeBringDeviceUp:
+		request = &wguser.MsgBringDeviceUp{}
+	case wguser.MsgTypeTakeDeviceDown:
+		request = &wguser.MsgTakeDeviceDown{}
+	case wguser.MsgTypeIsDeviceAlive:
+		request = &wguser.MsgIsDeviceAlive{}
 	}
 	if request != nil {
 		err := h.decoder.Decode(request)
@@ -295,15 +321,17 @@ func (h *handler) handleMessage(msgType wguser.MsgType, msgLen int) error {
 	if !h.isAuthenticated && msgType != wguser.MsgTypeAuthenticate {
 		err = errors.New("Not authenticated")
 	} else {
+		// NOTE: There is another switch statement a few lines above, which also needs
+		// to handle all message types.
 		switch msgType {
 		case wguser.MsgTypeAuthenticate:
 			err = h.handleAuthenticate(request.(*wguser.MsgAuthenticate))
 		case wguser.MsgTypeGetPeers:
 			respType = wguser.MsgTypeGetPeersResponse
-			resp, err = h.handleGetPeers()
+			resp, err = h.handleGetPeers(request.(*wguser.MsgGetPeers))
 		case wguser.MsgTypeGetDevice:
 			respType = wguser.MsgTypeGetDeviceResponse
-			resp, err = h.handleGetDevice()
+			resp, err = h.handleGetDevice(request.(*wguser.MsgGetDevice))
 		case wguser.MsgTypeCreatePeersInMemory:
 			err = h.handleCreatePeersInMemory(request.(*wguser.MsgCreatePeersInMemory))
 		case wguser.MsgTypeRemovePeerInMemory:
@@ -313,9 +341,11 @@ func (h *handler) handleMessage(msgType wguser.MsgType, msgLen int) error {
 		case wguser.MsgTypeSetProxyPeerInConfigFile:
 			err = h.handleSetProxyPeerInConfigFile(request.(*wguser.MsgSetProxyPeerInConfigFile))
 		case wguser.MsgTypeBringDeviceUp:
-			err = h.handleBringDeviceUp()
+			err = h.handleBringDeviceUp(request.(*wguser.MsgBringDeviceUp))
+		case wguser.MsgTypeTakeDeviceDown:
+			err = h.handleTakeDeviceDown(request.(*wguser.MsgTakeDeviceDown))
 		case wguser.MsgTypeIsDeviceAlive:
-			err = h.handleIsDeviceAlive()
+			err = h.handleIsDeviceAlive(request.(*wguser.MsgIsDeviceAlive))
 		default:
 			err = fmt.Errorf("Invalid request message %v", int(msgType))
 		}

@@ -187,33 +187,36 @@ func (c *Client) readResponse(responseType MsgType, expectResponseType MsgType, 
 	return nil
 }
 
-func (c *Client) GetPeers() (*MsgGetPeersResponse, error) {
+func (c *Client) GetPeers(deviceName string) (*MsgGetPeersResponse, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	msg := MsgGetPeers{DeviceName: deviceName}
 	resp := MsgGetPeersResponse{}
-	if err := c.do(MsgTypeGetPeers, nil, MsgTypeGetPeersResponse, &resp); err != nil {
+	if err := c.do(MsgTypeGetPeers, &msg, MsgTypeGetPeersResponse, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *Client) GetDevice() (*MsgGetDeviceResponse, error) {
+func (c *Client) GetDevice(deviceName string) (*MsgGetDeviceResponse, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	msg := MsgGetDevice{DeviceName: deviceName}
 	resp := MsgGetDeviceResponse{}
-	if err := c.do(MsgTypeGetDevice, nil, MsgTypeGetDeviceResponse, &resp); err != nil {
+	if err := c.do(MsgTypeGetDevice, &msg, MsgTypeGetDeviceResponse, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
 }
 
-func (c *Client) IsDeviceAlive() error {
+func (c *Client) IsDeviceAlive(deviceName string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	return c.do(MsgTypeIsDeviceAlive, nil, MsgTypeNone, nil)
+	msg := MsgIsDeviceAlive{DeviceName: deviceName}
+	return c.do(MsgTypeIsDeviceAlive, &msg, MsgTypeNone, nil)
 }
 
 func (c *Client) Authenticate() error {
@@ -226,18 +229,20 @@ func (c *Client) Authenticate() error {
 	return c.do(MsgTypeAuthenticate, &msg, MsgTypeNone, nil)
 }
 
-func (c *Client) BringDeviceUp() error {
+func (c *Client) BringDeviceUp(deviceName string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	return c.do(MsgTypeBringDeviceUp, nil, MsgTypeNone, nil)
+	msg := MsgBringDeviceUp{DeviceName: deviceName}
+	return c.do(MsgTypeBringDeviceUp, &msg, MsgTypeNone, nil)
 }
 
-func (c *Client) TakeDeviceDown() error {
+func (c *Client) TakeDeviceDown(deviceName string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	return c.do(MsgTypeTakeDeviceDown, nil, MsgTypeNone, nil)
+	msg := MsgTakeDeviceDown{DeviceName: deviceName}
+	return c.do(MsgTypeTakeDeviceDown, &msg, MsgTypeNone, nil)
 }
 
 func (c *Client) CreatePeers(msg *MsgCreatePeersInMemory) error {

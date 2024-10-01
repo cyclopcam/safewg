@@ -55,10 +55,18 @@ type MsgAuthenticate struct {
 	Secret string
 }
 
+type MsgGetPeers struct {
+	DeviceName string
+}
+
+type MsgGetDevice struct {
+	DeviceName string
+}
+
 type MsgGetDeviceResponse struct {
 	PrivateKey wgtypes.Key
 	ListenPort int
-	Address    string // Unlike the other state returned here, this is read from the Wireguard config file, so it might be empty
+	Addresses  []string // Unlike the other state returned here, this is read from the Wireguard config file, so it might be empty
 }
 
 type MsgGetPeersResponse struct {
@@ -66,23 +74,39 @@ type MsgGetPeersResponse struct {
 }
 
 type MsgCreatePeersInMemory struct {
-	Peers []CreatePeerInMemory
+	DeviceName string
+	Peers      []CreatePeerInMemory
 }
 
 type MsgRemovePeerInMemory struct {
-	PublicKey wgtypes.Key
-	AllowedIP net.IPNet
+	DeviceName string
+	PublicKey  wgtypes.Key
+	AllowedIPs []net.IPNet
 }
 
 type MsgSetProxyPeerInConfigFile struct {
-	PublicKey wgtypes.Key
-	AllowedIP net.IPNet
-	Endpoint  string
+	DeviceName string
+	PublicKey  wgtypes.Key
+	AllowedIPs []net.IPNet
+	Endpoint   string
+}
+
+type MsgBringDeviceUp struct {
+	DeviceName string
+}
+
+type MsgTakeDeviceDown struct {
+	DeviceName string
+}
+
+type MsgIsDeviceAlive struct {
+	DeviceName string
 }
 
 type MsgCreateDeviceInConfigFile struct {
+	DeviceName string
 	PrivateKey wgtypes.Key
-	Address    string
+	Addresses  []string
 }
 
 // Device is a cut-down clone of wgtypes.Device
@@ -103,7 +127,7 @@ type Peer struct {
 }
 
 type CreatePeerInMemory struct {
-	PublicKey wgtypes.Key
-	AllowedIP net.IPNet
-	Endpoint  string
+	PublicKey  wgtypes.Key
+	AllowedIPs []net.IPNet
+	Endpoint   string
 }
