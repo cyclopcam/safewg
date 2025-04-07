@@ -50,6 +50,20 @@ func (c *Client) Connect() error {
 	return nil
 }
 
+func (c *Client) SetMaxReadDuration(d time.Duration) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.maxReadDuration = d
+}
+
+func (c *Client) GetMaxReadDuration() time.Duration {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.maxReadDuration
+}
+
 func (c *Client) connect() error {
 	// max delay = 2 ^ 7 * 10ms = 1.28s
 	// max total delay ~= 2.5s
