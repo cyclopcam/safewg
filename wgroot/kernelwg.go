@@ -223,6 +223,10 @@ func configFilename(deviceName string) string {
 	return fmt.Sprintf("/etc/wireguard/%v.conf", deviceName)
 }
 
+func makeEtcWireguard() error {
+	return os.MkdirAll("/etc/wireguard", 0700)
+}
+
 // This is used on a Cyclops server when it is setting up it's Wireguard interface to
 // the proxy server. The purpose of this function is to create the initial /etc/wireguard/cyclops.conf
 // file, and/or set the [Interface] section at the top of that file.
@@ -243,6 +247,7 @@ func (h *handler) handleCreateDeviceInConfigFile(request *wguser.MsgCreateDevice
 	iface.set("PrivateKey", request.PrivateKey.String())
 	iface.set("Address", strings.Join(request.Addresses, ", "))
 
+	makeEtcWireguard()
 	return cfg.writeFile(configFilename(request.DeviceName))
 }
 
@@ -271,6 +276,7 @@ func (h *handler) handleSetProxyPeerInConfigFile(request *wguser.MsgSetProxyPeer
 	peer.set("AllowedIPs", strings.Join(allowedIPs, ", "))
 	peer.set("PersistentKeepalive", "25")
 
+	makeEtcWireguard()
 	return cfg.writeFile(configFilename(request.DeviceName))
 }
 
