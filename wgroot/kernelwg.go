@@ -12,8 +12,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/cyclopcam/logs"
-	"github.com/cyclopcam/safewg/wguser"
+	"github.com/cyclopcam/logs/v3"
+	"github.com/cyclopcam/safewg/v2/wguser"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
