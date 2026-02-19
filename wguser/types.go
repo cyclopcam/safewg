@@ -124,6 +124,7 @@ type Peer struct {
 	ReceiveBytes                int64
 	TransmitBytes               int64
 	AllowedIPs                  []net.IPNet
+	Endpoint                    string
 }
 
 type CreatePeerInMemory struct {

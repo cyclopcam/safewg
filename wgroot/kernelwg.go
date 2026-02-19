@@ -146,6 +146,9 @@ func (h *handler) handleGetPeers(request *wguser.MsgGetPeers) (any, error) {
 			TransmitBytes:               pi.TransmitBytes,
 			AllowedIPs:                  pi.AllowedIPs,
 		})
+		if pi.Endpoint != nil {
+			resp.Peers[len(resp.Peers)-1].Endpoint = pi.Endpoint.String()
+		}
 	}
 	return &resp, nil
 }
