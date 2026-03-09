@@ -11,9 +11,8 @@ import (
 	"syscall"
 )
 
-// Launch a copy of this process, but with the 'kernelwg' command line argument.
-// This other process will run with root privileges, because it needs to be able to
-// create and/or alter Wireguard interfaces.
+// Launch a copy of this process that will continue to run with root privileges,
+// because it needs to be able to create and/or alter Wireguard interfaces.
 //
 // This is one of the first things we do when starting up the cyclops server
 // or the HTTPS proxy server.
@@ -32,7 +31,7 @@ func LaunchRootModeSubProcess() (e error, secret string) {
 	fmt.Printf("Launching wireguard root-mode sub-process %v\n", self)
 
 	secret = strongRandomBase64(32)
-	cmd := exec.Command(self, "kernelwg")
+	cmd := exec.Command(self)
 	cmd.Env = append(cmd.Env, fmt.Sprintf("CYCLOPS_SOCKET_SECRET=%v", secret))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("PATH=%v", os.Getenv("PATH")))
 	cmd.Stdout = os.Stdout
