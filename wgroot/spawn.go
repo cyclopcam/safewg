@@ -11,7 +11,7 @@ import (
 	"syscall"
 )
 
-// Launch a copy of this process, but with the --kernelwg command line argument.
+// Launch a copy of this process, but with the 'kernelwg' command line argument.
 // This other process will run with root privileges, because it needs to be able to
 // create and/or alter Wireguard interfaces.
 //
@@ -32,7 +32,7 @@ func LaunchRootModeSubProcess() (e error, secret string) {
 	fmt.Printf("Launching wireguard root-mode sub-process %v\n", self)
 
 	secret = strongRandomBase64(32)
-	cmd := exec.Command(self, "--kernelwg")
+	cmd := exec.Command(self, "kernelwg")
 	cmd.Env = append(cmd.Env, fmt.Sprintf("CYCLOPS_SOCKET_SECRET=%v", secret))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("PATH=%v", os.Getenv("PATH")))
 	cmd.Stdout = os.Stdout
@@ -195,7 +195,7 @@ func IsRunningAsUser(username string) bool {
 }
 
 // Strip out command line arguments that are not needed by the child process.
-// stripFlags is a list of options, such as "--kernelwg", which do not have any
+// stripFlags is a list of options, such as "--novpn", which do not have any
 // arguments after them.
 // stripParameters is a list of options, such as "--username", which have
 // an associated argument after them (such as "cyclops", in our example).
