@@ -483,7 +483,7 @@ func verifyPermissions(logger logs.Log) error {
 // Returns true if we are the spawned root-mode process that must continue
 // with root-mode privileges.
 func IsSpawnedRootMode() bool {
-	return os.Getenv("CYCLOPS_SPAWNED_ROOT_MODE") != ""
+	return os.Getenv("CYCLOPS_SOCKET_SECRET") != ""
 }
 
 func Main() {
