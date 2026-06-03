@@ -277,7 +277,7 @@ func (h *handler) handleSetProxyPeerInConfigFile(request *wguser.MsgSetProxyPeer
 	peer.set("PublicKey", request.PublicKey.String())
 	peer.set("Endpoint", request.Endpoint)
 	peer.set("AllowedIPs", strings.Join(allowedIPs, ", "))
-	peer.set("PersistentKeepalive", "25")
+	peer.set("PersistentKeepalive", "25") // SYNC-WIREGUARD-KEEPALIVE-TIME
 
 	makeEtcWireguard()
 	return cfg.writeFile(configFilename(request.DeviceName))
