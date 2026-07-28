@@ -163,8 +163,9 @@ func (h *handler) handleCreatePeersInMemory(request *wguser.MsgCreatePeersInMemo
 	for _, p := range request.Peers {
 		//h.log.Infof("Peer %v, %v, (%v)", p.AllowedIP.IP, p.AllowedIP.Mask, p.AllowedIP)
 		cfg.Peers = append(cfg.Peers, wgtypes.PeerConfig{
-			PublicKey:  p.PublicKey,
-			AllowedIPs: p.AllowedIPs,
+			PublicKey:    p.PublicKey,
+			AllowedIPs:   p.AllowedIPs,
+			PresharedKey: &p.PresharedKey,
 		})
 	}
 	if err := h.wg.ConfigureDevice(request.DeviceName, cfg); err != nil {
@@ -278,6 +279,11 @@ func (h *handler) handleSetProxyPeerInConfigFile(request *wguser.MsgSetProxyPeer
 	peer.set("Endpoint", request.Endpoint)
 	peer.set("AllowedIPs", strings.Join(allowedIPs, ", "))
 	peer.set("PersistentKeepalive", "25") // SYNC-WIREGUARD-KEEPALIVE-TIME
+	if request.PresharedKey != (wgtypes.Key{}) {
+		peer.set("PresharedKey", request.PresharedKey.String())
+	} else {
+		peer.clear("PresharedKey")
+	}
 
 	makeEtcWireguard()
 	return cfg.writeFile(configFilename(request.DeviceName))

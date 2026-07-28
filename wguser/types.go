@@ -85,10 +85,11 @@ type MsgRemovePeerInMemory struct {
 }
 
 type MsgSetProxyPeerInConfigFile struct {
-	DeviceName string
-	PublicKey  wgtypes.Key
-	AllowedIPs []net.IPNet
-	Endpoint   string
+	DeviceName   string
+	PublicKey    wgtypes.Key
+	PresharedKey wgtypes.Key
+	AllowedIPs   []net.IPNet
+	Endpoint     string
 }
 
 type MsgBringDeviceUp struct {
@@ -128,7 +129,8 @@ type Peer struct {
 }
 
 type CreatePeerInMemory struct {
-	PublicKey  wgtypes.Key
-	AllowedIPs []net.IPNet
-	Endpoint   string
+	PublicKey    wgtypes.Key
+	PresharedKey wgtypes.Key
+	AllowedIPs   []net.IPNet
+	Endpoint     string
 }

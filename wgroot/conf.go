@@ -131,6 +131,16 @@ func (s *configSection) get(key string) *string {
 	return nil
 }
 
+// Clear a value in a section
+func (s *configSection) clear(key string) {
+	for i := range s.lines {
+		if s.lines[i].key == key {
+			s.lines = append(s.lines[:i], s.lines[i+1:]...)
+			return
+		}
+	}
+}
+
 // Returns true if the config line is non-empty, and the first non-whitespace character is not #.
 // In other words, return false if the line is empty or if the line is a comment.
 func hasContent(line string) bool {
