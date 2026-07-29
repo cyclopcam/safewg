@@ -140,6 +140,7 @@ func (h *handler) handleGetPeers(request *wguser.MsgGetPeers) (any, error) {
 	for _, pi := range device.Peers {
 		resp.Peers = append(resp.Peers, wguser.Peer{
 			PublicKey:                   pi.PublicKey,
+			PresharedKey:                pi.PresharedKey,
 			PersistentKeepaliveInterval: pi.PersistentKeepaliveInterval,
 			LastHandshakeTime:           pi.LastHandshakeTime,
 			ReceiveBytes:                pi.ReceiveBytes,
@@ -157,9 +158,7 @@ func (h *handler) handleGetPeers(request *wguser.MsgGetPeers) (any, error) {
 // This is used by the proxy for bringing peers online.
 func (h *handler) handleCreatePeersInMemory(request *wguser.MsgCreatePeersInMemory) error {
 	h.log.Infof("Creating %v peers", len(request.Peers))
-	cfg := wgtypes.Config{
-		ReplacePeers: false, // If this is false, then we append peers, which is what we want
-	}
+	cfg := wgtypes.Config{}
 	for _, p := range request.Peers {
 		//h.log.Infof("Peer %v, %v, (%v)", p.AllowedIP.IP, p.AllowedIP.Mask, p.AllowedIP)
 		cfg.Peers = append(cfg.Peers, wgtypes.PeerConfig{

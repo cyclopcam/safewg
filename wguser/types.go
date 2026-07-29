@@ -120,6 +120,7 @@ type Device struct {
 // Peer is a cut-down clone of wgtypes.Peer
 type Peer struct {
 	PublicKey                   wgtypes.Key
+	PresharedKey                wgtypes.Key
 	PersistentKeepaliveInterval time.Duration
 	LastHandshakeTime           time.Time
 	ReceiveBytes                int64
