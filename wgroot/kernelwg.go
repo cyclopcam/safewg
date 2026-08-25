@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/cyclopcam/logs/v3"
+	"github.com/cyclopcam/logs/v4"
 	"github.com/cyclopcam/safewg/v2/wguser"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -492,10 +492,7 @@ func IsSpawnedRootMode() bool {
 }
 
 func Main() {
-	logger, err := logs.NewLog()
-	if err != nil {
-		panic(err)
-	}
+	logger := logs.NewLog()
 	logger = logs.NewPrefixLogger(logger, "kernelwg")
 
 	clientSecret := os.Getenv("CYCLOPS_SOCKET_SECRET")
